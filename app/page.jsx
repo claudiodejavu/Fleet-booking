@@ -54,7 +54,7 @@ export default function Home() {
     const [p, a, v, r, unlinked] = await Promise.all([
       supabase.from("fleet_users").select("id,name").eq("auth_user_id",uid).maybeSingle(),
       supabase.from("fleet_admins").select("user_id").eq("user_id",uid).maybeSingle(),
-      supabase.from("vehicles").select("id,plate,make_model,provider,active").eq("active",true).order("plate"),
+      supabase.from("vehicles").select("id,plate,make_model,provider,active,maintenance").eq("active",true).order("plate"),
       supabase.from("reservations").select("id,vehicle_id,fleet_user_id,created_by,start_at,end_at,work_description").gte("end_at",monthStart(month).toISOString()).lt("start_at",monthEnd(month).toISOString()).order("start_at"),
       supabase.from("fleet_users").select("id,name,auth_user_id").is("auth_user_id",null).order("name")
     ]);
@@ -81,6 +81,7 @@ export default function Home() {
     loadData(session);
     const channel = supabase.channel("fleet-reservations-live")
       .on("postgres_changes",{event:"*",schema:"public",table:"reservations"},() => loadData(session))
+      .on("postgres_changes",{event:"*",schema:"public",table:"vehicles"},() => loadData(session))
       .subscribe();
     return () => { supabase.removeChannel(channel); };
   },[session,loadData]);
@@ -112,8 +113,8 @@ export default function Home() {
     if (new Date(start).getTime() < Date.now()-60000) return notify("No se pueden crear reservas con fecha de inicio pasada.","error");
     if (new Date(start).getTime() > Date.now()+30*24*60*60*1000) return notify("Las reservas se pueden realizar con un máximo de 30 días de antelación.","error");
     if (!selectedVehicles.length) return notify("Selecciona al menos un vehículo disponible.","error");
-    const blocked = availability.filter(v => selectedVehicles.includes(v.id) && v.conflicts.length);
-    if (blocked.length) return notify("Uno o más vehículos ya están ocupados en ese horario. Actualiza la disponibilidad.","error");
+    const blocked = availability.filter(v => selectedVehicles.includes(v.id) && (v.maintenance || v.conflicts.length));
+    if (blocked.length) return notify("Uno o más vehículos están ocupados o fuera de servicio. Actualiza la disponibilidad.","error");
     setBusy(true); notify("");
     const {data:createdCount,error} = await supabase.rpc("create_fleet_reservations",{
       p_vehicle_ids:selectedVehicles,
@@ -124,10 +125,27 @@ export default function Home() {
     setBusy(false);
     if(error) {
       if(error.code==="23P01") notify("Otro usuario acaba de reservar uno de esos vehículos en ese horario. No se ha guardado ninguna reserva de esta solicitud; actualiza la disponibilidad y vuelve a elegir.","error");
+      else if(error.message?.includes("mecánico")) notify(error.message,"error");
       else notify(error.message || "No se pudo completar la reserva. Inténtalo de nuevo.","error");
     } else {
       notify(`Reserva creada correctamente para ${createdCount || selectedVehicles.length} vehículo(s).`,"success");
       setSelectedVehicles([]); setWork(""); await loadData(session);
+    }
+  }
+
+  async function toggleVehicleMaintenance(vehicle) {
+    if (!isAdmin) return;
+    const next = !vehicle.maintenance;
+    const action = next ? "marcar como «En el mecánico»" : "volver a poner disponible";
+    if (!window.confirm(`¿Quieres ${action} el vehículo ${vehicle.plate}?`)) return;
+    setBusy(true);
+    const {error} = await supabase.from("vehicles").update({maintenance:next}).eq("id",vehicle.id);
+    setBusy(false);
+    if (error) notify(error.message,"error");
+    else {
+      if (next) setSelectedVehicles(current => current.filter(id => id !== vehicle.id));
+      notify(next ? `${vehicle.plate} marcado como «En el mecánico». Ya no se puede reservar.` : `${vehicle.plate} vuelve a estar disponible para reservas.`,"success");
+      await loadData(session);
     }
   }
 
@@ -217,14 +235,14 @@ export default function Home() {
 
     <section className="booking-layout">
       <div className="panel booking-panel">
-        <div className="section-heading"><div><p className="kicker">NUEVA SOLICITUD</p><h2>{parseDate(selectedDay).toLocaleDateString("es-ES",{weekday:"long",day:"numeric",month:"long"})}</h2></div><span className="count-pill">{availability.filter(v=>!v.conflicts.length).length} libres</span></div>
+        <div className="section-heading"><div><p className="kicker">NUEVA SOLICITUD</p><h2>{parseDate(selectedDay).toLocaleDateString("es-ES",{weekday:"long",day:"numeric",month:"long"})}</h2></div><span className="count-pill">{availability.filter(v=>!v.maintenance&&!v.conflicts.length).length} libres</span></div>
         <form onSubmit={book} className="stack">
           <div className="time-row"><label>Desde<input type="datetime-local" required min={dateInput(new Date(),new Date().getHours(),new Date().getMinutes())} max={dateInput(new Date(Date.now()+30*24*60*60*1000),23,59)} value={start} onChange={e=>setStart(e.target.value)}/></label><label>Hasta<input type="datetime-local" required min={start} value={end} onChange={e=>setEnd(e.target.value)}/></label></div>
           <div className="vehicle-picker"><div className="picker-title"><strong>Vehículos para este horario</strong><span>Selecciona uno o varios</span></div>
-            {availability.map(v=><label key={v.id} className={`vehicle-option ${v.conflicts.length?"occupied":""} ${selectedVehicles.includes(v.id)?"chosen":""}`}>
-              <input type="checkbox" disabled={!!v.conflicts.length || !profile} checked={selectedVehicles.includes(v.id)} onChange={()=>toggleVehicle(v.id)}/>
+            {availability.map(v=><label key={v.id} className={`vehicle-option ${v.conflicts.length?"occupied":""} ${v.maintenance?"maintenance":""} ${selectedVehicles.includes(v.id)?"chosen":""}`}>
+              <input type="checkbox" disabled={!!v.conflicts.length || !!v.maintenance || !profile} checked={selectedVehicles.includes(v.id)} onChange={()=>toggleVehicle(v.id)}/>
               <span className="vehicle-symbol">▰</span><span className="vehicle-details"><strong>{v.plate}</strong><small>{v.make_model} · {v.provider}</small></span>
-              <span className={`availability-tag ${v.conflicts.length?"busy":"free"}`}>{v.conflicts.length?"Ocupado":"Disponible"}</span>
+              <span className={`availability-tag ${v.maintenance?"maintenance":v.conflicts.length?"busy":"free"}`}>{v.maintenance?"En el mecánico":v.conflicts.length?"Ocupado":"Disponible"}</span>
             </label>)}
             {!availability.length&&<p className="muted">No hay vehículos activos.</p>}
           </div>
@@ -242,6 +260,8 @@ export default function Home() {
     </section>
 
     {isAdmin && <section className="panel admin-panel">
+      <div className="section-heading"><div><p className="kicker">ESTADO DE LA FLOTA</p><h2>Disponibilidad de vehículos</h2><p className="muted">Marca los vehículos que estén en el taller para bloquear nuevas reservas.</p></div><span className="admin-chip">Solo administrador</span></div>
+      <div className="fleet-status-list">{vehicles.map(v=><article className="fleet-status-item" key={v.id}><div><strong>{v.plate}</strong><small>{v.make_model} · {v.provider}</small></div><span className={`availability-tag ${v.maintenance?"maintenance":"free"}`}>{v.maintenance?"En el mecánico":"Operativo"}</span><button type="button" className="button-light" disabled={busy} onClick={()=>toggleVehicleMaintenance(v)}>{v.maintenance?"Reactivar vehículo":"Enviar al mecánico"}</button></article>)}</div>
       <div className="section-heading"><div><p className="kicker">GESTIÓN DE ACCESOS</p><h2>Invitar a un usuario</h2><p className="muted">Envía una invitación y vincula la cuenta con un perfil de flota existente.</p></div><span className="admin-chip">Solo administrador</span></div>
       <form onSubmit={invite} className="invite-form">
         <label>Perfil de flota<select required value={inviteProfile} onChange={e=>setInviteProfile(e.target.value)}><option value="">Selecciona una persona</option>{profiles.map(p=><option key={p.id} value={p.id}>{p.name}</option>)}<option value="__new__">＋ Crear un perfil nuevo</option></select></label>
