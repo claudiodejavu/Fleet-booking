@@ -107,17 +107,18 @@ export default function Home() {
     const blocked = availability.filter(v => selectedVehicles.includes(v.id) && v.conflicts.length);
     if (blocked.length) return notify("Uno o más vehículos ya están ocupados en ese horario. Actualiza la disponibilidad.","error");
     setBusy(true); notify("");
-    const rows = selectedVehicles.map(vehicle_id => ({
-      vehicle_id,fleet_user_id:profile.id,created_by:session.user.id,
-      start_at:new Date(start).toISOString(),end_at:new Date(end).toISOString(),work_description:work.trim()
-    }));
-    const {error} = await supabase.from("reservations").insert(rows);
+    const {data:createdCount,error} = await supabase.rpc("create_fleet_reservations",{
+      p_vehicle_ids:selectedVehicles,
+      p_start_at:new Date(start).toISOString(),
+      p_end_at:new Date(end).toISOString(),
+      p_work_description:work.trim()
+    });
     setBusy(false);
     if(error) {
-      if(error.code==="23P01") notify("Otro usuario acaba de reservar uno de esos vehículos en ese horario. Elige otro vehículo u horario.","error");
-      else notify(error.message,"error");
+      if(error.code==="23P01") notify("Otro usuario acaba de reservar uno de esos vehículos en ese horario. No se ha guardado ninguna reserva de esta solicitud; actualiza la disponibilidad y vuelve a elegir.","error");
+      else notify(error.message || "No se pudo completar la reserva. Inténtalo de nuevo.","error");
     } else {
-      notify(`Reserva creada para ${rows.length} vehículo(s).`,"success");
+      notify(`Reserva creada correctamente para ${createdCount || selectedVehicles.length} vehículo(s).`,"success");
       setSelectedVehicles([]); setWork(""); await loadData(session);
     }
   }
