@@ -171,7 +171,7 @@ export default function Home() {
       <div className="login-statement"><span>Nos movemos</span><strong>para crear</strong><em>experiencias.</em></div>
       <p className="login-story-copy">Cada proyecto empieza con una buena planificación. Gestiona los desplazamientos del equipo desde un único lugar.</p>
       <div className="login-index"><span>01 — 03</span><span>FLEET BOOKING</span><span>MAD · VLC · BCN</span></div>
-      <div className="login-orbit orbit-one"></div><div className="login-orbit orbit-two"></div><div className="login-cross">✳</div>
+      <div className="login-orbit orbit-one"></div><div className="login-orbit orbit-two"></div>
     </section>
     <section className="login-card">
       <p className="kicker">ÁREA PRIVADA <span>／</span> ACCESO DE EQUIPO</p>
