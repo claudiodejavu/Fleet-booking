@@ -106,6 +106,7 @@ export default function Home() {
   async function book(e) {
     e.preventDefault();
     if (!profile) return notify("Tu cuenta todavía no está vinculada a un perfil de flota. Contacta con el administrador.","error");
+    if (!work.trim()) return notify("Indica el Proyecto / Varios antes de reservar.","error");
     if (new Date(end) <= new Date(start)) return notify("La hora de fin debe ser posterior al inicio.","error");
     if (dateKey(new Date(start)) !== selectedDay) return notify("La fecha de inicio debe coincidir con el día seleccionado en el calendario.","error");
     if (new Date(start).getTime() < Date.now()-60000) return notify("No se pueden crear reservas con fecha de inicio pasada.","error");
@@ -164,7 +165,7 @@ export default function Home() {
   if (!supabase) return <main className="shell"><section className="panel"><h1>Fleet Booking</h1><p>Falta configurar la conexión con Supabase en Vercel.</p></section></main>;
 
   if (!session) return <main className="login-shell"><section className="login-card">
-    <div className="brand-mark">D<span>J</span></div><p className="kicker">DEJAVU PROJECT · FLEET</p><h1>Fleet Booking</h1>
+    <img className="brand-logo" src="https://dejavuproject.es/wp-content/uploads/logo-dejavu-project.svg" alt="Dejavu Project"/><p className="kicker">DEJAVU PROJECT · FLEET</p><h1>Fleet Booking</h1>
     <p className="muted">Accede para organizar tus desplazamientos de trabajo.</p>
     <form onSubmit={login} className="stack">
       <label>Correo electrónico<input type="email" required value={email} onChange={e=>setEmail(e.target.value)} autoComplete="username"/></label>
@@ -215,8 +216,8 @@ export default function Home() {
             </label>)}
             {!availability.length&&<p className="muted">No hay vehículos activos.</p>}
           </div>
-          <label>Motivo / destino<input value={work} onChange={e=>setWork(e.target.value)} placeholder="Describe brevemente el desplazamiento"/></label>
-          <button disabled={busy||!profile||!selectedVehicles.length}>{busy?"Procesando…":`Reservar ${selectedVehicles.length||""} vehículo(s)`}</button>
+          <label>Proyecto / Varios<input value={work} onChange={e=>setWork(e.target.value)} placeholder="Indica el proyecto o escribe Varios" required maxLength={160}/></label>
+          <button disabled={busy||!profile||!selectedVehicles.length||!work.trim()}>{busy?"Procesando…":`Reservar ${selectedVehicles.length||""} vehículo(s)`}</button>
         </form>
       </div>
       <div className="panel day-panel">
