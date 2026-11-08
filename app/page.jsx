@@ -33,6 +33,9 @@ export default function Home() {
   const [work,setWork] = useState("");
   const [inviteEmail,setInviteEmail] = useState("");
   const [inviteProfile,setInviteProfile] = useState("");
+  const [newFleetName,setNewFleetName] = useState("");
+  const [invitePassword,setInvitePassword] = useState("");
+  const [inviteFlow,setInviteFlow] = useState(false);
   const [busy,setBusy] = useState(false);
   const [message,setMessage] = useState("");
   const [messageType,setMessageType] = useState("info");
@@ -60,6 +63,7 @@ export default function Home() {
 
   useEffect(() => {
     if (!supabase) return;
+    if (window.location.hash.includes("type=invite")) setInviteFlow(true);
     supabase.auth.getSession().then(({data}) => setSession(data.session));
     const {data:{subscription}} = supabase.auth.onAuthStateChange((_event,s) => setSession(s));
     return () => subscription.unsubscribe();
@@ -127,10 +131,20 @@ export default function Home() {
     e.preventDefault();
     if (!inviteProfile) return notify("Selecciona el perfil de flota que vas a vincular.","error");
     setBusy(true); notify("");
-    const {data,error} = await supabase.functions.invoke("fleet-invite-user",{body:{email:inviteEmail.trim(),fleet_user_id:inviteProfile}});
+    const {data,error} = await supabase.functions.invoke("fleet-invite-user",{body:{email:inviteEmail.trim(),fleet_user_id:inviteProfile,fleet_name:newFleetName.trim()}});
     setBusy(false);
     if(error || data?.error) notify(data?.error || error.message,"error");
-    else { notify(`Invitación enviada a ${inviteEmail}. El perfil ya está vinculado.`,"success"); setInviteEmail(""); setInviteProfile(""); await loadData(session); }
+    else { notify(`Invitación enviada a ${inviteEmail}. El perfil ya está vinculado.`,"success"); setInviteEmail(""); setInviteProfile(""); setNewFleetName(""); await loadData(session); }
+  }
+
+  async function activateAccount(e) {
+    e.preventDefault();
+    if (invitePassword.length < 8) return notify("La contraseña debe tener al menos 8 caracteres.","error");
+    setBusy(true);
+    const {error} = await supabase.auth.updateUser({password:invitePassword});
+    setBusy(false);
+    if (error) notify(error.message,"error");
+    else { setInviteFlow(false); setInvitePassword(""); window.history.replaceState({},document.title,window.location.pathname); notify("Contraseña establecida. Ya puedes utilizar Fleet Booking.","success"); }
   }
 
   function toggleVehicle(id) {
@@ -156,6 +170,7 @@ export default function Home() {
       <div className="top-actions">{profile && <span className="user-chip">{profile.name}</span>}{isAdmin && <span className="admin-chip">Administrador</span>}<button className="button-light" onClick={()=>supabase.auth.signOut()}>Cerrar sesión</button></div>
     </header>
 
+    {inviteFlow && <section className="panel activation-panel"><p className="kicker">ACTIVACIÓN DE CUENTA</p><h2>Establece tu contraseña</h2><p className="muted">Ya has validado tu invitación. Crea una contraseña de al menos 8 caracteres para acceder a Fleet Booking.</p><form onSubmit={activateAccount} className="invite-form"><label>Nueva contraseña<input type="password" minLength={8} required value={invitePassword} onChange={e=>setInvitePassword(e.target.value)} autoComplete="new-password"/></label><button disabled={busy}>{busy?"Guardando…":"Activar cuenta"}</button></form></section>}
     <section className="hero">
       <div><p className="kicker">GESTIÓN DE MOVILIDAD</p><h2>Organiza los desplazamientos de trabajo</h2><p>Consulta el calendario y reserva los vehículos que necesitas.</p></div>
       <div className="hero-stat"><strong>{vehicles.length.toString().padStart(2,"0")}</strong><span>Vehículos activos</span></div>
@@ -205,11 +220,12 @@ export default function Home() {
     {isAdmin && <section className="panel admin-panel">
       <div className="section-heading"><div><p className="kicker">GESTIÓN DE ACCESOS</p><h2>Invitar a un usuario</h2><p className="muted">Envía una invitación y vincula la cuenta con un perfil de flota existente.</p></div><span className="admin-chip">Solo administrador</span></div>
       <form onSubmit={invite} className="invite-form">
-        <label>Perfil de flota<select required value={inviteProfile} onChange={e=>setInviteProfile(e.target.value)}><option value="">Selecciona una persona</option>{profiles.map(p=><option key={p.id} value={p.id}>{p.name}</option>)}</select></label>
+        <label>Perfil de flota<select required value={inviteProfile} onChange={e=>setInviteProfile(e.target.value)}><option value="">Selecciona una persona</option>{profiles.map(p=><option key={p.id} value={p.id}>{p.name}</option>)}<option value="__new__">＋ Crear un perfil nuevo</option></select></label>
+        {inviteProfile==="__new__" && <label>Nombre de la persona<input required minLength={2} maxLength={80} value={newFleetName} onChange={e=>setNewFleetName(e.target.value)} placeholder="Nombre y apellidos"/></label>}
         <label>Correo electrónico<input type="email" required value={inviteEmail} onChange={e=>setInviteEmail(e.target.value)} placeholder="nombre@empresa.com"/></label>
-        <button disabled={busy||!profiles.length}>{busy?"Enviando…":"Enviar invitación"}</button>
+        <button disabled={busy||(!profiles.length&&inviteProfile!=="__new__")||!inviteProfile}>{busy?"Enviando…":"Enviar invitación"}</button>
       </form>
-      {!profiles.length&&<p className="notice success">Todos los perfiles de flota disponibles ya están vinculados a una cuenta.</p>}
+      {!profiles.length&&inviteProfile!=="__new__"&&<p className="notice success">Todos los perfiles existentes están vinculados. Puedes crear un perfil nuevo desde el selector.</p>}
       <p className="admin-help">La persona recibirá un correo de Supabase para activar su acceso y establecer su contraseña. No compartas contraseñas por correo.</p>
     </section>}
 
