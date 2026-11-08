@@ -1,35 +1,224 @@
 "use client";
-import {useEffect,useState} from "react";
-import {createClient} from "@supabase/supabase-js";
-const url=process.env.NEXT_PUBLIC_SUPABASE_URL;
-const key=process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-const supabase=url&&key?createClient(url,key):null;
-export default function Home(){
- const [session,setSession]=useState(null),[email,setEmail]=useState(""),[password,setPassword]=useState(""),[profile,setProfile]=useState(null),[vehicles,setVehicles]=useState([]),[reservations,setReservations]=useState([]),[vehicle,setVehicle]=useState(""),[start,setStart]=useState(""),[end,setEnd]=useState(""),[work,setWork]=useState(""),[busy,setBusy]=useState(false),[message,setMessage]=useState("");
- async function load(s){
-  const {data:p,error:pe}=await supabase.from("fleet_users").select("id,name").eq("auth_user_id",s.user.id).maybeSingle();
-  if(pe) setMessage(pe.message); setProfile(p||null);
-  const {data:v,error:ve}=await supabase.from("vehicles").select("id,plate,make_model,provider,active").eq("active",true).order("plate");
-  if(ve)setMessage(ve.message);setVehicles(v||[]);
-  const {data:r,error:re}=await supabase.from("reservations").select("id,vehicle_id,start_at,end_at,work_description,created_by").order("start_at",{ascending:false}).limit(100);
-  if(re)setMessage(re.message);setReservations(r||[]);
- }
- useEffect(()=>{if(!supabase)return;supabase.auth.getSession().then(({data})=>{setSession(data.session);if(data.session)load(data.session)});const {data:{subscription}}=supabase.auth.onAuthStateChange((_e,s)=>{setSession(s);if(s)load(s);else{setProfile(null);setVehicles([]);setReservations([])}});return()=>subscription.unsubscribe()},[]);
- async function login(e){e.preventDefault();setBusy(true);setMessage("");const {error}=await supabase.auth.signInWithPassword({email,password});setBusy(false);if(error)setMessage(error.message)}
- async function deleteReservation(id){
-  if(!window.confirm("¿Seguro que quieres borrar esta reserva? Esta acción no se puede deshacer."))return;
-  setBusy(true);setMessage("");
-  const {error}=await supabase.from("reservations").delete().eq("id",id).eq("created_by",session.user.id);
-  setBusy(false);
-  if(error)setMessage(error.message);
-  else{setMessage("Reserva eliminada correctamente.");await load(session)}
- }
- async function book(e){e.preventDefault();if(!profile){setMessage("Tu usuario todavía no está vinculado a un perfil de flota. Contacta con el administrador.");return}if(new Date(end)<=new Date(start)){setMessage("La hora de fin debe ser posterior al inicio.");return}setBusy(true);setMessage("");
- const {error}=await supabase.from("reservations").insert({vehicle_id:vehicle,fleet_user_id:profile.id,created_by:session.user.id,start_at:new Date(start).toISOString(),end_at:new Date(end).toISOString(),work_description:work});
- setBusy(false);if(error)setMessage(error.message);else{setMessage("Solicitud de reserva guardada.");setWork("");await load(session)}
- }
- if(!supabase)return <main className="wrap"><section className="panel"><h1>Fleet Booking</h1><p>Falta configurar la conexión segura con Supabase en Vercel.</p></section></main>;
- return <main className="wrap"><header><div className="brand">FB</div><div><p className="eyebrow">GESTIÓN DE FLOTA</p><h1>Fleet Booking</h1></div>{session&&<button className="ghost" onClick={()=>supabase.auth.signOut()}>Salir</button>}</header>
- {!session?<section className="panel auth"><p className="eyebrow">BIENVENIDO</p><h2>Iniciar sesión</h2><p>Accede con tu cuenta de Fleet Booking.</p><form onSubmit={login}><label>Correo electrónico<input type="email" required value={email} onChange={e=>setEmail(e.target.value)} autoComplete="username"/></label><label>Contraseña<input type="password" required value={password} onChange={e=>setPassword(e.target.value)} autoComplete="current-password"/></label><button disabled={busy}>{busy?"Entrando…":"Entrar"}</button></form></section>:<><section className="welcome"><div><p className="eyebrow">PANEL DE CONTROL</p><h2>Organiza los desplazamientos de trabajo</h2><p>Consulta vehículos y gestiona tus reservas.</p></div><div className="stats"><strong>{vehicles.length}</strong><span>Vehículos activos</span></div></section>{!profile&&<p className="notice">Tu cuenta ha iniciado sesión, pero aún no está vinculada a un perfil de flota. El administrador debe asociarla antes de reservar.</p>}<section className="grid"><div className="panel"><h2>Nueva reserva</h2><form onSubmit={book}><label>Vehículo<select required value={vehicle} onChange={e=>setVehicle(e.target.value)}><option value="">Selecciona un vehículo</option>{vehicles.map(v=><option key={v.id} value={v.id}>{v.plate} · {v.make_model} ({v.provider})</option>)}</select></label><label>Desde<input type="datetime-local" required value={start} onChange={e=>setStart(e.target.value)}/></label><label>Hasta<input type="datetime-local" required value={end} onChange={e=>setEnd(e.target.value)}/></label><label>Descripción del trabajo<input value={work} onChange={e=>setWork(e.target.value)} placeholder="Motivo o destino"/></label><button disabled={busy||!profile}>{busy?"Guardando…":"Solicitar reserva"}</button></form></div><div className="panel"><h2>Vehículos disponibles</h2><div className="list">{vehicles.map(v=><article className="vehicle" key={v.id}><div className="car">▰</div><div><strong>{v.plate}</strong><p>{v.make_model}</p><small>{v.provider}</small></div><span className="active">Activo</span></article>)}{!vehicles.length&&<p>No hay vehículos activos.</p>}</div></div></section><section className="panel"><h2>Reservas recientes</h2>{reservations.length?<div className="tablewrap"><table><thead><tr><th>Vehículo</th><th>Inicio</th><th>Fin</th><th>Trabajo</th><th>Acción</th></tr></thead><tbody>{reservations.map(r=><tr key={r.id}><td>{vehicles.find(v=>v.id===r.vehicle_id)?.plate||"Vehículo"}</td><td>{new Date(r.start_at).toLocaleString("es-ES")}</td><td>{new Date(r.end_at).toLocaleString("es-ES")}</td><td>{r.work_description||"—"}</td><td>{r.created_by===session.user.id?<button type="button" className="delete" disabled={busy} onClick={()=>deleteReservation(r.id)}>Borrar</button>:<span>—</span>}</td></tr>)}</tbody></table></div>:<p>Aún no hay reservas registradas.</p>}</section></>}
- {message&&<p className="notice" role="status">{message}</p>}<footer>Fleet Booking · Acceso privado</footer></main>
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { createClient } from "@supabase/supabase-js";
+
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+const supabase = supabaseUrl && supabaseKey ? createClient(supabaseUrl, supabaseKey) : null;
+
+const pad = (n) => String(n).padStart(2, "0");
+const dateKey = (d) => `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+const dateInput = (d, h, m = 0) => `${dateKey(d)}T${pad(h)}:${pad(m)}`;
+const parseDate = (s) => { const [y,m,d] = s.split("-").map(Number); return new Date(y,m-1,d); };
+const fmtTime = (s) => new Date(s).toLocaleTimeString("es-ES", {hour:"2-digit",minute:"2-digit"});
+const fmtDateTime = (s) => new Date(s).toLocaleString("es-ES", {day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit"});
+const monthStart = (d) => new Date(d.getFullYear(), d.getMonth(), 1);
+const monthEnd = (d) => new Date(d.getFullYear(), d.getMonth()+1, 1);
+const overlaps = (a,b,c,d) => new Date(a) < new Date(d) && new Date(b) > new Date(c);
+
+export default function Home() {
+  const [session,setSession] = useState(null);
+  const [email,setEmail] = useState("");
+  const [password,setPassword] = useState("");
+  const [profile,setProfile] = useState(null);
+  const [isAdmin,setIsAdmin] = useState(false);
+  const [vehicles,setVehicles] = useState([]);
+  const [reservations,setReservations] = useState([]);
+  const [profiles,setProfiles] = useState([]);
+  const [month,setMonth] = useState(() => new Date(new Date().getFullYear(),new Date().getMonth(),1));
+  const [selectedDay,setSelectedDay] = useState(dateKey(new Date()));
+  const [start,setStart] = useState(() => dateInput(new Date(),9));
+  const [end,setEnd] = useState(() => dateInput(new Date(),17));
+  const [selectedVehicles,setSelectedVehicles] = useState([]);
+  const [work,setWork] = useState("");
+  const [inviteEmail,setInviteEmail] = useState("");
+  const [inviteProfile,setInviteProfile] = useState("");
+  const [busy,setBusy] = useState(false);
+  const [message,setMessage] = useState("");
+  const [messageType,setMessageType] = useState("info");
+
+  const notify = (text,type="info") => { setMessage(text); setMessageType(type); };
+  const loadData = useCallback(async (currentSession) => {
+    if (!supabase || !currentSession) return;
+    const uid = currentSession.user.id;
+    const [p, a, v, r, unlinked] = await Promise.all([
+      supabase.from("fleet_users").select("id,name").eq("auth_user_id",uid).maybeSingle(),
+      supabase.from("fleet_admins").select("user_id").eq("user_id",uid).maybeSingle(),
+      supabase.from("vehicles").select("id,plate,make_model,provider,active").eq("active",true).order("plate"),
+      supabase.from("reservations").select("id,vehicle_id,fleet_user_id,created_by,start_at,end_at,work_description").gte("end_at",monthStart(month).toISOString()).lt("start_at",monthEnd(month).toISOString()).order("start_at"),
+      supabase.from("fleet_users").select("id,name,auth_user_id").is("auth_user_id",null).order("name")
+    ]);
+    if (p.error) notify(p.error.message,"error");
+    if (v.error) notify(v.error.message,"error");
+    if (r.error) notify(r.error.message,"error");
+    setProfile(p.data || null);
+    setIsAdmin(!!a.data);
+    setVehicles(v.data || []);
+    setReservations(r.data || []);
+    setProfiles(unlinked.data || []);
+  },[month]);
+
+  useEffect(() => {
+    if (!supabase) return;
+    supabase.auth.getSession().then(({data}) => setSession(data.session));
+    const {data:{subscription}} = supabase.auth.onAuthStateChange((_event,s) => setSession(s));
+    return () => subscription.unsubscribe();
+  },[]);
+
+  useEffect(() => {
+    if (!session || !supabase) return;
+    loadData(session);
+    const channel = supabase.channel("fleet-reservations-live")
+      .on("postgres_changes",{event:"*",schema:"public",table:"reservations"},() => loadData(session))
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  },[session,loadData]);
+
+  useEffect(() => {
+    const d = parseDate(selectedDay);
+    if (d.getFullYear() !== month.getFullYear() || d.getMonth() !== month.getMonth()) setMonth(monthStart(d));
+  },[selectedDay,month]);
+
+  const days = useMemo(() => {
+    const first = monthStart(month);
+    const offset = (first.getDay()+6)%7;
+    return Array.from({length:42},(_,i) => new Date(first.getFullYear(),first.getMonth(),i-offset+1));
+  },[month]);
+
+  const selectedDayReservations = useMemo(() => reservations.filter(r => dateKey(new Date(r.start_at)) === selectedDay || (new Date(r.start_at) < parseDate(selectedDay) && new Date(r.end_at) > parseDate(selectedDay))),[reservations,selectedDay]);
+  const availability = useMemo(() => vehicles.map(v => ({
+    ...v,
+    conflicts: selectedDayReservations.filter(r => r.vehicle_id===v.id && overlaps(r.start_at,r.end_at,start,end)),
+  })),[vehicles,selectedDayReservations,start,end]);
+
+  async function login(e) {
+    e.preventDefault(); setBusy(true); notify("");
+    const {error} = await supabase.auth.signInWithPassword({email,password});
+    setBusy(false); if(error) notify(error.message,"error");
+  }
+
+  async function book(e) {
+    e.preventDefault();
+    if (!profile) return notify("Tu cuenta todavía no está vinculada a un perfil de flota. Contacta con el administrador.","error");
+    if (new Date(end) <= new Date(start)) return notify("La hora de fin debe ser posterior al inicio.","error");
+    if (dateKey(new Date(start)) !== selectedDay || dateKey(new Date(end)) !== selectedDay) return notify("El inicio y el fin deben estar dentro del día seleccionado.","error");
+    if (!selectedVehicles.length) return notify("Selecciona al menos un vehículo disponible.","error");
+    const blocked = availability.filter(v => selectedVehicles.includes(v.id) && v.conflicts.length);
+    if (blocked.length) return notify("Uno o más vehículos ya están ocupados en ese horario. Actualiza la disponibilidad.","error");
+    setBusy(true); notify("");
+    const rows = selectedVehicles.map(vehicle_id => ({
+      vehicle_id,fleet_user_id:profile.id,created_by:session.user.id,
+      start_at:new Date(start).toISOString(),end_at:new Date(end).toISOString(),work_description:work.trim()
+    }));
+    const {error} = await supabase.from("reservations").insert(rows);
+    setBusy(false);
+    if(error) {
+      if(error.code==="23P01") notify("Otro usuario acaba de reservar uno de esos vehículos en ese horario. Elige otro vehículo u horario.","error");
+      else notify(error.message,"error");
+    } else {
+      notify(`Reserva creada para ${rows.length} vehículo(s).`,"success");
+      setSelectedVehicles([]); setWork(""); await loadData(session);
+    }
+  }
+
+  async function deleteReservation(id) {
+    if (!window.confirm("¿Seguro que quieres eliminar esta reserva? Esta acción no se puede deshacer.")) return;
+    setBusy(true); const {error} = await supabase.from("reservations").delete().eq("id",id);
+    setBusy(false);
+    if(error) notify(error.message,"error"); else { notify("Reserva eliminada.","success"); await loadData(session); }
+  }
+
+  async function invite(e) {
+    e.preventDefault();
+    if (!inviteProfile) return notify("Selecciona el perfil de flota que vas a vincular.","error");
+    setBusy(true); notify("");
+    const {data,error} = await supabase.functions.invoke("fleet-invite-user",{body:{email:inviteEmail.trim(),fleet_user_id:inviteProfile}});
+    setBusy(false);
+    if(error || data?.error) notify(data?.error || error.message,"error");
+    else { notify(`Invitación enviada a ${inviteEmail}. El perfil ya está vinculado.`,"success"); setInviteEmail(""); setInviteProfile(""); await loadData(session); }
+  }
+
+  function toggleVehicle(id) {
+    setSelectedVehicles(current => current.includes(id) ? current.filter(x=>x!==id) : [...current,id]);
+  }
+
+  if (!supabase) return <main className="shell"><section className="panel"><h1>Fleet Booking</h1><p>Falta configurar la conexión con Supabase en Vercel.</p></section></main>;
+
+  if (!session) return <main className="login-shell"><section className="login-card">
+    <div className="brand-mark">D<span>J</span></div><p className="kicker">DEJAVU PROJECT · FLEET</p><h1>Fleet Booking</h1>
+    <p className="muted">Accede para organizar tus desplazamientos de trabajo.</p>
+    <form onSubmit={login} className="stack">
+      <label>Correo electrónico<input type="email" required value={email} onChange={e=>setEmail(e.target.value)} autoComplete="username"/></label>
+      <label>Contraseña<input type="password" required value={password} onChange={e=>setPassword(e.target.value)} autoComplete="current-password"/></label>
+      <button disabled={busy}>{busy?"Entrando…":"Entrar en la aplicación"}</button>
+    </form>
+    {message && <p className={`notice ${messageType}`}>{message}</p>}
+  </section></main>;
+
+  return <main className="shell">
+    <header className="topbar">
+      <div className="brand-lockup"><div className="brand-mark">D<span>J</span></div><div><p className="kicker">DEJAVU PROJECT</p><h1>Fleet Booking</h1></div></div>
+      <div className="top-actions">{profile && <span className="user-chip">{profile.name}</span>}{isAdmin && <span className="admin-chip">Administrador</span>}<button className="button-light" onClick={()=>supabase.auth.signOut()}>Cerrar sesión</button></div>
+    </header>
+
+    <section className="hero">
+      <div><p className="kicker">GESTIÓN DE MOVILIDAD</p><h2>Organiza los desplazamientos de trabajo</h2><p>Consulta el calendario y reserva los vehículos que necesitas.</p></div>
+      <div className="hero-stat"><strong>{vehicles.length.toString().padStart(2,"0")}</strong><span>Vehículos activos</span></div>
+    </section>
+
+    {!profile && <div className="notice error">Tu cuenta está autenticada, pero no está vinculada a un perfil de flota. Contacta con el administrador para completar el alta.</div>}
+
+    <section className="calendar-panel panel">
+      <div className="section-heading"><div><p className="kicker">PLANIFICACIÓN</p><h2>Calendario de reservas</h2></div><div className="month-controls"><button className="icon-button" aria-label="Mes anterior" onClick={()=>setMonth(new Date(month.getFullYear(),month.getMonth()-1,1))}>‹</button><strong>{month.toLocaleDateString("es-ES",{month:"long",year:"numeric"})}</strong><button className="icon-button" aria-label="Mes siguiente" onClick={()=>setMonth(new Date(month.getFullYear(),month.getMonth()+1,1))}>›</button></div></div>
+      <div className="calendar-grid weekday-row">{["L","M","X","J","V","S","D"].map((d,i)=><div key={i}>{d}</div>)}</div>
+      <div className="calendar-grid">{days.map((d,i)=>{
+        const key=dateKey(d), inMonth=d.getMonth()===month.getMonth();
+        const count=reservations.filter(r=>dateKey(new Date(r.start_at))===key || (new Date(r.start_at)<new Date(d.getFullYear(),d.getMonth(),d.getDate()) && new Date(r.end_at)>new Date(d.getFullYear(),d.getMonth(),d.getDate()))).length;
+        return <button key={key} className={`day-cell ${inMonth?"":"outside"} ${key===selectedDay?"selected":""} ${key===dateKey(new Date())?"today":""}`} onClick={()=>{setSelectedDay(key);setStart(dateInput(d,9));setEnd(dateInput(d,17));setSelectedVehicles([]);}}>
+          <span>{d.getDate()}</span>{count>0&&<small>{count} {count===1?"reserva":"reservas"}</small>}
+        </button>;
+      })}</div>
+      <div className="legend"><span><i className="dot today-dot"/> Hoy</span><span><i className="dot selected-dot"/> Día seleccionado</span><span>Los cambios se actualizan en tiempo real</span></div>
+    </section>
+
+    <section className="booking-layout">
+      <div className="panel booking-panel">
+        <div className="section-heading"><div><p className="kicker">NUEVA SOLICITUD</p><h2>{parseDate(selectedDay).toLocaleDateString("es-ES",{weekday:"long",day:"numeric",month:"long"})}</h2></div><span className="count-pill">{availability.filter(v=>!v.conflicts.length).length} libres</span></div>
+        <form onSubmit={book} className="stack">
+          <div className="time-row"><label>Desde<input type="datetime-local" required value={start} onChange={e=>setStart(e.target.value)}/></label><label>Hasta<input type="datetime-local" required value={end} onChange={e=>setEnd(e.target.value)}/></label></div>
+          <div className="vehicle-picker"><div className="picker-title"><strong>Vehículos para este horario</strong><span>Selecciona uno o varios</span></div>
+            {availability.map(v=><label key={v.id} className={`vehicle-option ${v.conflicts.length?"occupied":""} ${selectedVehicles.includes(v.id)?"chosen":""}`}>
+              <input type="checkbox" disabled={!!v.conflicts.length || !profile} checked={selectedVehicles.includes(v.id)} onChange={()=>toggleVehicle(v.id)}/>
+              <span className="vehicle-symbol">▰</span><span className="vehicle-details"><strong>{v.plate}</strong><small>{v.make_model} · {v.provider}</small></span>
+              <span className={`availability-tag ${v.conflicts.length?"busy":"free"}`}>{v.conflicts.length?"Ocupado":"Disponible"}</span>
+            </label>)}
+            {!availability.length&&<p className="muted">No hay vehículos activos.</p>}
+          </div>
+          <label>Motivo / destino<input value={work} onChange={e=>setWork(e.target.value)} placeholder="Describe brevemente el desplazamiento"/></label>
+          <button disabled={busy||!profile||!selectedVehicles.length}>{busy?"Procesando…":`Reservar ${selectedVehicles.length||""} vehículo(s)`}</button>
+        </form>
+      </div>
+      <div className="panel day-panel">
+        <p className="kicker">ACTIVIDAD DEL DÍA</p><h2>Reservas existentes</h2>
+        {selectedDayReservations.length ? <div className="reservation-list">{selectedDayReservations.map(r=>{
+          const v=vehicles.find(x=>x.id===r.vehicle_id);
+          return <article className="reservation-item" key={r.id}><div className="reservation-time">{fmtTime(r.start_at)}<span>—</span>{fmtTime(r.end_at)}</div><div className="reservation-info"><strong>{v?.plate||"Vehículo"}</strong><small>{r.work_description||"Desplazamiento de trabajo"}</small></div>{(isAdmin||r.created_by===session.user.id)&&<button className="delete-button" disabled={busy} onClick={()=>deleteReservation(r.id)}>Eliminar</button>}</article>;
+        })}</div>:<div className="empty-state"><span>✓</span><strong>Sin reservas para este día</strong><p>Los vehículos están libres, según los horarios seleccionados.</p></div>}
+      </div>
+    </section>
+
+    {isAdmin && <section className="panel admin-panel">
+      <div className="section-heading"><div><p className="kicker">GESTIÓN DE ACCESOS</p><h2>Invitar a un usuario</h2><p className="muted">Envía una invitación y vincula la cuenta con un perfil de flota existente.</p></div><span className="admin-chip">Solo administrador</span></div>
+      <form onSubmit={invite} className="invite-form">
+        <label>Perfil de flota<select required value={inviteProfile} onChange={e=>setInviteProfile(e.target.value)}><option value="">Selecciona una persona</option>{profiles.map(p=><option key={p.id} value={p.id}>{p.name}</option>)}</select></label>
+        <label>Correo electrónico<input type="email" required value={inviteEmail} onChange={e=>setInviteEmail(e.target.value)} placeholder="nombre@empresa.com"/></label>
+        <button disabled={busy||!profiles.length}>{busy?"Enviando…":"Enviar invitación"}</button>
+      </form>
+      {!profiles.length&&<p className="notice success">Todos los perfiles de flota disponibles ya están vinculados a una cuenta.</p>}
+      <p className="admin-help">La persona recibirá un correo de Supabase para activar su acceso y establecer su contraseña. No compartas contraseñas por correo.</p>
+    </section>}
+
+    {message && <div className={`notice ${messageType}`} role="status">{message}</div>}
+    <footer><span>DEJAVU PROJECT</span><span>Fleet Booking · Acceso privado</span></footer>
+  </main>;
 }
