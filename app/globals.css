@@ -87,9 +87,11 @@ input:focus,select:focus{border-color:var(--brand-teal);box-shadow:0 0 0 3px #3f
 
 
 /* Vehicle maintenance status */
-.availability-tag.maintenance{background:#fff2df;color:#94621d;border-color:#ead5ad}
-.vehicle-option.maintenance{background:#fff9ef;border-color:#ead5ad;opacity:.82}
-.vehicle-option.maintenance .vehicle-symbol{background:#f8ebd3;color:#94621d}
+.availability-tag.maintenance{background:#fde8e7;color:#b42318;border:1px solid #f3c1bd}
+.vehicle-option.maintenance{background:#fff5f4;border-color:#f0c4c0;opacity:1}
+.vehicle-option.maintenance .vehicle-symbol{background:#fde8e7;color:#b42318}
+.vehicle-option.maintenance .vehicle-details strong{color:#b42318}
+.vehicle-option.maintenance .availability-tag{color:#b42318}
 .fleet-status-list{display:grid;gap:9px;margin:18px 0 30px}
 .fleet-status-item{display:flex;align-items:center;gap:14px;padding:13px 15px;border:1px solid #e5e0da;background:#fff}
 .fleet-status-item>div{display:grid;gap:4px;flex:1;min-width:0}
