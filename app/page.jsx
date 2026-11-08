@@ -164,20 +164,32 @@ export default function Home() {
 
   if (!supabase) return <main className="shell"><section className="panel"><h1>Fleet Booking</h1><p>Falta configurar la conexión con Supabase en Vercel.</p></section></main>;
 
-  if (!session) return <main className="login-shell"><section className="login-card">
-    <img className="brand-logo" src="https://dejavuproject.es/wp-content/uploads/logo-dejavu-project.svg" alt="Dejavu Project"/><p className="kicker">DEJAVU PROJECT · FLEET</p><h1>Fleet Booking</h1>
-    <p className="muted">Accede para organizar tus desplazamientos de trabajo.</p>
-    <form onSubmit={login} className="stack">
-      <label>Correo electrónico<input type="email" required value={email} onChange={e=>setEmail(e.target.value)} autoComplete="username"/></label>
-      <label>Contraseña<input type="password" required value={password} onChange={e=>setPassword(e.target.value)} autoComplete="current-password"/></label>
-      <button disabled={busy}>{busy?"Entrando…":"Entrar en la aplicación"}</button>
-    </form>
-    {message && <p className={`notice ${messageType}`}>{message}</p>}
-  </section></main>;
+  if (!session) return <main className="login-shell">
+    <section className="login-story">
+      <img className="brand-logo" src="https://dejavuproject.es/wp-content/uploads/logo-dejavu-project.svg" alt="Dejavu Project"/>
+      <p className="login-eyebrow">DEJAVU PROJECT <span>／</span> MOVILIDAD INTERNA</p>
+      <div className="login-statement"><span>Nos movemos</span><strong>para crear</strong><em>experiencias.</em></div>
+      <p className="login-story-copy">Cada proyecto empieza con una buena planificación. Gestiona los desplazamientos del equipo desde un único lugar.</p>
+      <div className="login-index"><span>01 — 03</span><span>FLEET BOOKING</span><span>MAD · VLC · BCN</span></div>
+      <div className="login-orbit orbit-one"></div><div className="login-orbit orbit-two"></div><div className="login-cross">✳</div>
+    </section>
+    <section className="login-card">
+      <p className="kicker">ÁREA PRIVADA <span>／</span> ACCESO DE EQUIPO</p>
+      <h1>Bienvenido<span>.</span></h1>
+      <p className="muted">Accede para organizar tus desplazamientos de trabajo.</p>
+      <form onSubmit={login} className="stack">
+        <label>Correo electrónico<input type="email" required value={email} onChange={e=>setEmail(e.target.value)} autoComplete="username" placeholder="nombre@dejavuproject.es"/></label>
+        <label>Contraseña<input type="password" required value={password} onChange={e=>setPassword(e.target.value)} autoComplete="current-password" placeholder="Tu contraseña"/></label>
+        <button disabled={busy}>{busy?"Entrando…":"Entrar en la aplicación"} <span aria-hidden="true">↗</span></button>
+      </form>
+      {message && <p className={`notice ${messageType}`}>{message}</p>}
+      <p className="login-security">ACCESO RESTRINGIDO · SOLO PERSONAL AUTORIZADO</p>
+    </section>
+  </main>;
 
   return <main className="shell">
     <header className="topbar">
-      <div className="brand-lockup"><div className="brand-mark">D<span>J</span></div><div><p className="kicker">DEJAVU PROJECT</p><h1>Fleet Booking</h1></div></div>
+      <div className="brand-lockup"><img className="brand-logo" src="https://dejavuproject.es/wp-content/uploads/logo-dejavu-project.svg" alt="Dejavu Project"/><span className="brand-divider"></span><div><p className="kicker">OPERACIONES</p><h1>Fleet Booking</h1></div></div>
       <div className="top-actions">{profile && <span className="user-chip">{profile.name}</span>}{isAdmin && <span className="admin-chip">Administrador</span>}<button className="button-light" onClick={()=>supabase.auth.signOut()}>Cerrar sesión</button></div>
     </header>
 
