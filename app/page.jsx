@@ -9,6 +9,13 @@ const supabase = supabaseUrl && supabaseKey ? createClient(supabaseUrl, supabase
 const pad = (n) => String(n).padStart(2, "0");
 const dateKey = (d) => `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
 const dateInput = (d, h, m = 0) => `${dateKey(d)}T${pad(h)}:${pad(m)}`;
+const defaultBookingTimes = (d) => {
+  const now = new Date();
+  let startMinutes = 9 * 60;
+  if (dateKey(d) === dateKey(now)) startMinutes = Math.min(23 * 60, Math.ceil((now.getHours() * 60 + now.getMinutes() + 5) / 15) * 15);
+  const endMinutes = Math.min(23 * 60 + 59, Math.max(startMinutes + 60, 17 * 60));
+  return [dateInput(d, Math.floor(startMinutes / 60), startMinutes % 60), dateInput(d, Math.floor(endMinutes / 60), endMinutes % 60)];
+};
 const parseDate = (s) => { const [y,m,d] = s.split("-").map(Number); return new Date(y,m-1,d); };
 const fmtTime = (s) => new Date(s).toLocaleTimeString("es-ES", {hour:"2-digit",minute:"2-digit"});
 const fmtDateTime = (s) => new Date(s).toLocaleString("es-ES", {day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit"});
@@ -27,8 +34,8 @@ export default function Home() {
   const [profiles,setProfiles] = useState([]);
   const [month,setMonth] = useState(() => new Date(new Date().getFullYear(),new Date().getMonth(),1));
   const [selectedDay,setSelectedDay] = useState(dateKey(new Date()));
-  const [start,setStart] = useState(() => dateInput(new Date(),9));
-  const [end,setEnd] = useState(() => dateInput(new Date(),17));
+  const [start,setStart] = useState(() => defaultBookingTimes(new Date())[0]);
+  const [end,setEnd] = useState(() => defaultBookingTimes(new Date())[1]);
   const [selectedVehicles,setSelectedVehicles] = useState([]);
   const [work,setWork] = useState("");
   const [inviteEmail,setInviteEmail] = useState("");
@@ -182,13 +189,13 @@ export default function Home() {
     {!profile && <div className="notice error">Tu cuenta está autenticada, pero no está vinculada a un perfil de flota. Contacta con el administrador para completar el alta.</div>}
 
     <section className="calendar-panel panel">
-      <div className="section-heading"><div><p className="kicker">PLANIFICACIÓN</p><h2>Calendario de reservas</h2></div><div className="month-controls"><button className="icon-button" aria-label="Mes anterior" onClick={()=>{const d=new Date(month.getFullYear(),month.getMonth()-1,1);setMonth(d);setSelectedDay(dateKey(d));setStart(dateInput(d,9));setEnd(dateInput(d,17));setSelectedVehicles([]);}}>‹</button><strong>{month.toLocaleDateString("es-ES",{month:"long",year:"numeric"})}</strong><button className="icon-button" aria-label="Mes siguiente" onClick={()=>{const d=new Date(month.getFullYear(),month.getMonth()+1,1);setMonth(d);setSelectedDay(dateKey(d));setStart(dateInput(d,9));setEnd(dateInput(d,17));setSelectedVehicles([]);}}>›</button></div></div>
+      <div className="section-heading"><div><p className="kicker">PLANIFICACIÓN</p><h2>Calendario de reservas</h2></div><div className="month-controls"><button className="icon-button" aria-label="Mes anterior" onClick={()=>{const d=new Date(month.getFullYear(),month.getMonth()-1,1);setMonth(d);setSelectedDay(dateKey(d));setStart(defaultBookingTimes(d)[0]);setEnd(defaultBookingTimes(d)[1]);setSelectedVehicles([]);}}>‹</button><strong>{month.toLocaleDateString("es-ES",{month:"long",year:"numeric"})}</strong><button className="icon-button" aria-label="Mes siguiente" onClick={()=>{const d=new Date(month.getFullYear(),month.getMonth()+1,1);setMonth(d);setSelectedDay(dateKey(d));setStart(defaultBookingTimes(d)[0]);setEnd(defaultBookingTimes(d)[1]);setSelectedVehicles([]);}}>›</button></div></div>
       <p className="calendar-note">Puedes consultar cualquier mes. Las reservas se pueden crear desde ahora y hasta 30 días por adelantado.</p>
       <div className="calendar-grid weekday-row">{["L","M","X","J","V","S","D"].map((d,i)=><div key={i}>{d}</div>)}</div>
       <div className="calendar-grid">{days.map((d,i)=>{
         const key=dateKey(d), inMonth=d.getMonth()===month.getMonth();
         const count=reservations.filter(r=>dateKey(new Date(r.start_at))===key || (new Date(r.start_at)<new Date(d.getFullYear(),d.getMonth(),d.getDate()) && new Date(r.end_at)>new Date(d.getFullYear(),d.getMonth(),d.getDate()))).length;
-        return <button key={key} className={`day-cell ${inMonth?"":"outside"} ${key===selectedDay?"selected":""} ${key===dateKey(new Date())?"today":""}`} onClick={()=>{setSelectedDay(key);if(!inMonth)setMonth(monthStart(d));setStart(dateInput(d,9));setEnd(dateInput(d,17));setSelectedVehicles([]);}}>
+        return <button key={key} className={`day-cell ${inMonth?"":"outside"} ${key===selectedDay?"selected":""} ${key===dateKey(new Date())?"today":""}`} onClick={()=>{setSelectedDay(key);if(!inMonth)setMonth(monthStart(d));setStart(defaultBookingTimes(d)[0]);setEnd(defaultBookingTimes(d)[1]);setSelectedVehicles([]);}}>
           <span>{d.getDate()}</span>{count>0&&<small>{count} {count===1?"reserva":"reservas"}</small>}
         </button>;
       })}</div>
