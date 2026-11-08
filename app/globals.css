@@ -84,3 +84,16 @@ footer{margin-top:10px;border-top:1px solid #ded9d3;padding-top:20px;font-size:9
 footer span:first-child{color:var(--brand-teal)}
 input:focus,select:focus{border-color:var(--brand-teal);box-shadow:0 0 0 3px #3f8f861c}
 @media(max-width:900px){.login-story{background:linear-gradient(138deg,#202b3c 0%,#26394a 62%,#31565a 100%)}}
+
+
+/* Vehicle maintenance status */
+.availability-tag.maintenance{background:#fff2df;color:#94621d;border-color:#ead5ad}
+.vehicle-option.maintenance{background:#fff9ef;border-color:#ead5ad;opacity:.82}
+.vehicle-option.maintenance .vehicle-symbol{background:#f8ebd3;color:#94621d}
+.fleet-status-list{display:grid;gap:9px;margin:18px 0 30px}
+.fleet-status-item{display:flex;align-items:center;gap:14px;padding:13px 15px;border:1px solid #e5e0da;background:#fff}
+.fleet-status-item>div{display:grid;gap:4px;flex:1;min-width:0}
+.fleet-status-item>div strong{font-size:13px}
+.fleet-status-item>div small{font-size:11px;color:#817a73}
+.fleet-status-item .button-light{white-space:nowrap}
+@media(max-width:560px){.fleet-status-item{flex-wrap:wrap;gap:9px}.fleet-status-item>div{flex-basis:calc(60% - 10px)}.fleet-status-item .availability-tag{margin-left:auto}.fleet-status-item .button-light{width:100%}}
