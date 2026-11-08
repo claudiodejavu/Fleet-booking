@@ -107,7 +107,7 @@ export default function Home() {
     e.preventDefault();
     if (!profile) return notify("Tu cuenta todavía no está vinculada a un perfil de flota. Contacta con el administrador.","error");
     if (new Date(end) <= new Date(start)) return notify("La hora de fin debe ser posterior al inicio.","error");
-    if (dateKey(new Date(start)) !== selectedDay || dateKey(new Date(end)) !== selectedDay) return notify("El inicio y el fin deben estar dentro del día seleccionado.","error");
+    if (dateKey(new Date(start)) !== selectedDay) return notify("La fecha de inicio debe coincidir con el día seleccionado en el calendario.","error");
     if (new Date(start).getTime() < Date.now()-60000) return notify("No se pueden crear reservas con fecha de inicio pasada.","error");
     if (new Date(start).getTime() > Date.now()+30*24*60*60*1000) return notify("Las reservas se pueden realizar con un máximo de 30 días de antelación.","error");
     if (!selectedVehicles.length) return notify("Selecciona al menos un vehículo disponible.","error");
@@ -206,7 +206,7 @@ export default function Home() {
       <div className="panel booking-panel">
         <div className="section-heading"><div><p className="kicker">NUEVA SOLICITUD</p><h2>{parseDate(selectedDay).toLocaleDateString("es-ES",{weekday:"long",day:"numeric",month:"long"})}</h2></div><span className="count-pill">{availability.filter(v=>!v.conflicts.length).length} libres</span></div>
         <form onSubmit={book} className="stack">
-          <div className="time-row"><label>Desde<input type="datetime-local" required min={dateInput(new Date(),new Date().getHours(),new Date().getMinutes())} max={dateInput(new Date(Date.now()+30*24*60*60*1000),23,59)} value={start} onChange={e=>setStart(e.target.value)}/></label><label>Hasta<input type="datetime-local" required min={start} max={dateInput(parseDate(selectedDay),23,59)} value={end} onChange={e=>setEnd(e.target.value)}/></label></div>
+          <div className="time-row"><label>Desde<input type="datetime-local" required min={dateInput(new Date(),new Date().getHours(),new Date().getMinutes())} max={dateInput(new Date(Date.now()+30*24*60*60*1000),23,59)} value={start} onChange={e=>setStart(e.target.value)}/></label><label>Hasta<input type="datetime-local" required min={start} value={end} onChange={e=>setEnd(e.target.value)}/></label></div>
           <div className="vehicle-picker"><div className="picker-title"><strong>Vehículos para este horario</strong><span>Selecciona uno o varios</span></div>
             {availability.map(v=><label key={v.id} className={`vehicle-option ${v.conflicts.length?"occupied":""} ${selectedVehicles.includes(v.id)?"chosen":""}`}>
               <input type="checkbox" disabled={!!v.conflicts.length || !profile} checked={selectedVehicles.includes(v.id)} onChange={()=>toggleVehicle(v.id)}/>
