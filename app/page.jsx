@@ -74,11 +74,6 @@ export default function Home() {
     return () => { supabase.removeChannel(channel); };
   },[session,loadData]);
 
-  useEffect(() => {
-    const d = parseDate(selectedDay);
-    if (d.getFullYear() !== month.getFullYear() || d.getMonth() !== month.getMonth()) setMonth(monthStart(d));
-  },[selectedDay,month]);
-
   const days = useMemo(() => {
     const first = monthStart(month);
     const offset = (first.getDay()+6)%7;
@@ -169,12 +164,12 @@ export default function Home() {
     {!profile && <div className="notice error">Tu cuenta está autenticada, pero no está vinculada a un perfil de flota. Contacta con el administrador para completar el alta.</div>}
 
     <section className="calendar-panel panel">
-      <div className="section-heading"><div><p className="kicker">PLANIFICACIÓN</p><h2>Calendario de reservas</h2></div><div className="month-controls"><button className="icon-button" aria-label="Mes anterior" onClick={()=>setMonth(new Date(month.getFullYear(),month.getMonth()-1,1))}>‹</button><strong>{month.toLocaleDateString("es-ES",{month:"long",year:"numeric"})}</strong><button className="icon-button" aria-label="Mes siguiente" onClick={()=>setMonth(new Date(month.getFullYear(),month.getMonth()+1,1))}>›</button></div></div>
+      <div className="section-heading"><div><p className="kicker">PLANIFICACIÓN</p><h2>Calendario de reservas</h2></div><div className="month-controls"><button className="icon-button" aria-label="Mes anterior" onClick={()=>{const d=new Date(month.getFullYear(),month.getMonth()-1,1);setMonth(d);setSelectedDay(dateKey(d));setStart(dateInput(d,9));setEnd(dateInput(d,17));setSelectedVehicles([]);}}>‹</button><strong>{month.toLocaleDateString("es-ES",{month:"long",year:"numeric"})}</strong><button className="icon-button" aria-label="Mes siguiente" onClick={()=>{const d=new Date(month.getFullYear(),month.getMonth()+1,1);setMonth(d);setSelectedDay(dateKey(d));setStart(dateInput(d,9));setEnd(dateInput(d,17));setSelectedVehicles([]);}}>›</button></div></div>
       <div className="calendar-grid weekday-row">{["L","M","X","J","V","S","D"].map((d,i)=><div key={i}>{d}</div>)}</div>
       <div className="calendar-grid">{days.map((d,i)=>{
         const key=dateKey(d), inMonth=d.getMonth()===month.getMonth();
         const count=reservations.filter(r=>dateKey(new Date(r.start_at))===key || (new Date(r.start_at)<new Date(d.getFullYear(),d.getMonth(),d.getDate()) && new Date(r.end_at)>new Date(d.getFullYear(),d.getMonth(),d.getDate()))).length;
-        return <button key={key} className={`day-cell ${inMonth?"":"outside"} ${key===selectedDay?"selected":""} ${key===dateKey(new Date())?"today":""}`} onClick={()=>{setSelectedDay(key);setStart(dateInput(d,9));setEnd(dateInput(d,17));setSelectedVehicles([]);}}>
+        return <button key={key} className={`day-cell ${inMonth?"":"outside"} ${key===selectedDay?"selected":""} ${key===dateKey(new Date())?"today":""}`} onClick={()=>{setSelectedDay(key);if(!inMonth)setMonth(monthStart(d));setStart(dateInput(d,9));setEnd(dateInput(d,17));setSelectedVehicles([]);}}>
           <span>{d.getDate()}</span>{count>0&&<small>{count} {count===1?"reserva":"reservas"}</small>}
         </button>;
       })}</div>
