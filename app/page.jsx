@@ -27,6 +27,7 @@ export default function Home() {
   const [session,setSession] = useState(null);
   const [email,setEmail] = useState("");
   const [password,setPassword] = useState("");
+  const [resettingPassword,setResettingPassword] = useState(false);
   const [profile,setProfile] = useState(null);
   const [isAdmin,setIsAdmin] = useState(false);
   const [vehicles,setVehicles] = useState([]);
@@ -106,6 +107,15 @@ export default function Home() {
     e.preventDefault(); setBusy(true); notify("");
     const {error} = await supabase.auth.signInWithPassword({email,password});
     setBusy(false); if(error) notify(error.message,"error");
+  }
+
+  async function resetPassword() {
+    if (!email.trim()) return notify("Escribe tu correo electrónico para enviarte el enlace de recuperación.","error");
+    setBusy(true); notify("");
+    const {error} = await supabase.auth.resetPasswordForEmail(email.trim(), {redirectTo: `${window.location.origin}/`});
+    setBusy(false);
+    if (error) notify(error.message,"error");
+    else notify("Si existe una cuenta con ese correo, recibirás un enlace para restablecer la contraseña. Revisa también la carpeta de spam.","success");
   }
 
   async function book(e) {
@@ -202,7 +212,8 @@ export default function Home() {
       <form onSubmit={login} className="stack">
         <label>Correo electrónico<input type="email" required value={email} onChange={e=>setEmail(e.target.value)} autoComplete="username" placeholder="nombre@dejavuproject.es"/></label>
         <label>Contraseña<input type="password" required value={password} onChange={e=>setPassword(e.target.value)} autoComplete="current-password" placeholder="Tu contraseña"/></label>
-        <button disabled={busy}>{busy?"Entrando…":"Entrar en la aplicación"} <span aria-hidden="true">↗</span></button>
+        <button disabled={busy}>{busy?"Entrando…":"Entrar"}</button>
+        <button type="button" className="forgot-password-link" disabled={busy} onClick={resetPassword}>¿Has olvidado tu contraseña?</button>
       </form>
       {message && <p className={`notice ${messageType}`}>{message}</p>}
       <p className="login-security">ACCESO RESTRINGIDO · SOLO PERSONAL AUTORIZADO</p>
