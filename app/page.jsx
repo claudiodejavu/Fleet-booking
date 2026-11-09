@@ -55,7 +55,7 @@ export default function Home() {
       supabase.from("fleet_users").select("id,name").eq("auth_user_id",uid).maybeSingle(),
       supabase.from("fleet_admins").select("user_id").eq("user_id",uid).maybeSingle(),
       supabase.from("vehicles").select("id,plate,make_model,provider,active,maintenance").eq("active",true).order("plate"),
-      supabase.from("reservations").select("id,vehicle_id,fleet_user_id,created_by,start_at,end_at,work_description").gte("end_at",monthStart(month).toISOString()).lt("start_at",monthEnd(month).toISOString()).order("start_at"),
+      supabase.from("reservations").select("id,vehicle_id,fleet_user_id,created_by,start_at,end_at,work_description,fleet_user:fleet_users!reservations_fleet_user_id_fkey(name)").gte("end_at",monthStart(month).toISOString()).lt("start_at",monthEnd(month).toISOString()).order("start_at"),
       supabase.from("fleet_users").select("id,name,auth_user_id").is("auth_user_id",null).order("name")
     ]);
     if (p.error) notify(p.error.message,"error");
@@ -254,7 +254,7 @@ export default function Home() {
         <p className="kicker">ACTIVIDAD DEL DÍA</p><h2>Reservas existentes</h2>
         {selectedDayReservations.length ? <div className="reservation-list">{selectedDayReservations.map(r=>{
           const v=vehicles.find(x=>x.id===r.vehicle_id);
-          return <article className="reservation-item" key={r.id}><div className="reservation-time">{fmtTime(r.start_at)}<span>—</span>{fmtTime(r.end_at)}</div><div className="reservation-info"><strong>{v?.plate||"Vehículo"}</strong><small>{r.work_description||"Desplazamiento de trabajo"}</small></div>{(isAdmin||r.created_by===session.user.id)&&<button className="delete-button" disabled={busy} onClick={()=>deleteReservation(r.id)}>Eliminar</button>}</article>;
+          return <article className="reservation-item" key={r.id}><div className="reservation-time">{fmtTime(r.start_at)}<span>—</span>{fmtTime(r.end_at)}</div><div className="reservation-info"><strong>{v?.plate||"Vehículo"}</strong><small>{r.fleet_user?.name||"Persona no disponible"}</small><small>{r.work_description||"Desplazamiento de trabajo"}</small></div>{(isAdmin||r.created_by===session.user.id)&&<button className="delete-button" disabled={busy} onClick={()=>deleteReservation(r.id)}>Eliminar</button>}</article>;
         })}</div>:<div className="empty-state"><span>✓</span><strong>Sin reservas para este día</strong><p>Los vehículos están libres, según los horarios seleccionados.</p></div>}
       </div>
     </section>
