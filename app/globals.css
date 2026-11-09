@@ -99,3 +99,7 @@ input:focus,select:focus{border-color:var(--brand-teal);box-shadow:0 0 0 3px #3f
 .fleet-status-item>div small{font-size:11px;color:#817a73}
 .fleet-status-item .button-light{white-space:nowrap}
 @media(max-width:560px){.fleet-status-item{flex-wrap:wrap;gap:9px}.fleet-status-item>div{flex-basis:calc(60% - 10px)}.fleet-status-item .availability-tag{margin-left:auto}.fleet-status-item .button-light{width:100%}}
+
+/* Login — password recovery link */
+.login-card .forgot-password-link{justify-self:start;margin-top:-8px;padding:4px 0;border:0;background:transparent;color:var(--brand-blue);font-size:11px;font-weight:700;text-decoration:underline;text-underline-offset:3px;cursor:pointer}
+.login-card .forgot-password-link:hover{color:var(--brand-teal);background:transparent;transform:none}
