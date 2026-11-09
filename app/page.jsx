@@ -41,6 +41,8 @@ export default function Home() {
   const [end,setEnd] = useState(() => defaultBookingTimes(new Date())[1]);
   const [selectedVehicles,setSelectedVehicles] = useState([]);
   const [work,setWork] = useState("");
+  const [destination,setDestination] = useState("");
+  const [customDestination,setCustomDestination] = useState("");
   const [inviteEmail,setInviteEmail] = useState("");
   const [inviteProfile,setInviteProfile] = useState("");
   const [newFleetName,setNewFleetName] = useState("");
@@ -58,7 +60,7 @@ export default function Home() {
       supabase.from("fleet_users").select("id,name").eq("auth_user_id",uid).maybeSingle(),
       supabase.from("fleet_admins").select("user_id").eq("user_id",uid).maybeSingle(),
       supabase.from("vehicles").select("id,plate,make_model,provider,active,maintenance").eq("active",true).order("plate"),
-      supabase.from("reservations").select("id,vehicle_id,fleet_user_id,created_by,start_at,end_at,work_description,fleet_user:fleet_users!reservations_fleet_user_id_fkey(name)").gte("end_at",monthStart(month).toISOString()).lt("start_at",monthEnd(month).toISOString()).order("start_at"),
+      supabase.from("reservations").select("id,vehicle_id,fleet_user_id,created_by,start_at,end_at,work_description,destination,fleet_user:fleet_users!reservations_fleet_user_id_fkey(name)").gte("end_at",monthStart(month).toISOString()).lt("start_at",monthEnd(month).toISOString()).order("start_at"),
       supabase.from("fleet_users").select("id,name,auth_user_id").is("auth_user_id",null).order("name"),
       supabase.from("fleet_users").select("id,name,auth_user_id").order("name")
     ]);
@@ -134,6 +136,8 @@ export default function Home() {
     e.preventDefault();
     if (!profile) return notify("Tu cuenta todavía no está vinculada a un perfil de flota. Contacta con el administrador.","error");
     if (!work.trim()) return notify("Indica el Proyecto / Varios antes de reservar.","error");
+    const finalDestination = destination === "__other__" ? customDestination.trim() : destination;
+    if (!finalDestination) return notify("Indica el destino de la reserva.","error");
     if (new Date(end) <= new Date(start)) return notify("La hora de fin debe ser posterior al inicio.","error");
     if (dateKey(new Date(start)) !== selectedDay) return notify("La fecha de inicio debe coincidir con el día seleccionado en el calendario.","error");
     if (new Date(start).getTime() < Date.now()-60000) return notify("No se pueden crear reservas con fecha de inicio pasada.","error");
@@ -146,7 +150,8 @@ export default function Home() {
       p_vehicle_ids:selectedVehicles,
       p_start_at:new Date(start).toISOString(),
       p_end_at:new Date(end).toISOString(),
-      p_work_description:work.trim()
+      p_work_description:work.trim(),
+      p_destination:finalDestination
     });
     setBusy(false);
     if(error) {
@@ -155,7 +160,7 @@ export default function Home() {
       else notify(error.message || "No se pudo completar la reserva. Inténtalo de nuevo.","error");
     } else {
       notify(`Reserva creada correctamente para ${createdCount || selectedVehicles.length} vehículo(s).`,"success");
-      setSelectedVehicles([]); setWork(""); await loadData(session);
+      setSelectedVehicles([]); setWork(""); setDestination(""); setCustomDestination(""); await loadData(session);
     }
   }
 
@@ -275,15 +280,17 @@ export default function Home() {
             </label>)}
             {!availability.length&&<p className="muted">No hay vehículos activos.</p>}
           </div>
+          <label>Destino<select required value={destination} onChange={e=>{setDestination(e.target.value);setCustomDestination("");}}><option value="">Selecciona una ciudad</option>{["Madrid","Barcelona","Valencia","Sevilla","Zaragoza","Málaga","Murcia","Palma de Mallorca","Bilbao","Alicante","Córdoba","Valladolid","Vigo","Gijón","Granada","A Coruña","San Sebastián","Santander","Pamplona","Salamanca","Toledo","Cádiz","Tarragona","Girona","Lleida","Castellón de la Plana","Almería","Burgos","León","Oviedo"].map(city=><option key={city} value={city}>{city}</option>)}<option value="__other__">Otra</option></select></label>
+          {destination==="__other__" && <label>Especifica el destino<input required value={customDestination} onChange={e=>setCustomDestination(e.target.value)} placeholder="Escribe la ciudad o destino" maxLength={120}/></label>}
           <label>Proyecto / Varios<input value={work} onChange={e=>setWork(e.target.value)} placeholder="Indica el proyecto o escribe Varios" required maxLength={160}/></label>
-          <button disabled={busy||!profile||!selectedVehicles.length||!work.trim()}>{busy?"Procesando…":`Reservar ${selectedVehicles.length||""} vehículo(s)`}</button>
+          <button disabled={busy||!profile||!selectedVehicles.length||!work.trim()||!destination||(destination==="__other__"&&!customDestination.trim())}>{busy?"Procesando…":`Reservar ${selectedVehicles.length||""} vehículo(s)`}</button>
         </form>
       </div>
       <div className="panel day-panel">
         <p className="kicker">ACTIVIDAD DEL DÍA</p><h2>Reservas existentes</h2>
         {selectedDayReservations.length ? <div className="reservation-list">{selectedDayReservations.map(r=>{
           const v=vehicles.find(x=>x.id===r.vehicle_id);
-          return <article className="reservation-item" key={r.id}><div className="reservation-time">{fmtTime(r.start_at)}<span>—</span>{fmtTime(r.end_at)}</div><div className="reservation-info"><strong>{v?.plate||"Vehículo"}</strong><small>{r.fleet_user?.name||"Persona no disponible"}</small><small>{r.work_description||"Desplazamiento de trabajo"}</small></div>{(isAdmin||r.created_by===session.user.id)&&<button className="delete-button" disabled={busy} onClick={()=>deleteReservation(r.id)}>Eliminar</button>}</article>;
+          return <article className="reservation-item" key={r.id}><div className="reservation-time">{fmtTime(r.start_at)}<span>—</span>{fmtTime(r.end_at)}</div><div className="reservation-info"><strong>{v?.plate||"Vehículo"}</strong><small>{r.fleet_user?.name||"Persona no disponible"}</small><small>{r.destination ? `Destino: ${r.destination}` : "Destino no indicado"}</small><small>{r.work_description||"Desplazamiento de trabajo"}</small></div>{(isAdmin||r.created_by===session.user.id)&&<button className="delete-button" disabled={busy} onClick={()=>deleteReservation(r.id)}>Eliminar</button>}</article>;
         })}</div>:<div className="empty-state"><span>✓</span><strong>Sin reservas para este día</strong><p>Los vehículos están libres, según los horarios seleccionados.</p></div>}
       </div>
     </section>
