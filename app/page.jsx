@@ -28,6 +28,7 @@ export default function Home() {
   const [email,setEmail] = useState("");
   const [password,setPassword] = useState("");
   const [resettingPassword,setResettingPassword] = useState(false);
+  const [recoveryFlow,setRecoveryFlow] = useState(false);
   const [profile,setProfile] = useState(null);
   const [isAdmin,setIsAdmin] = useState(false);
   const [vehicles,setVehicles] = useState([]);
@@ -76,6 +77,7 @@ export default function Home() {
   useEffect(() => {
     if (!supabase) return;
     if (window.location.hash.includes("type=invite")) setInviteFlow(true);
+    if (window.location.hash.includes("type=recovery")) setRecoveryFlow(true);
     supabase.auth.getSession().then(({data}) => setSession(data.session));
     const {data:{subscription}} = supabase.auth.onAuthStateChange((_event,s) => setSession(s));
     return () => subscription.unsubscribe();
@@ -116,6 +118,16 @@ export default function Home() {
     setBusy(false);
     if (error) notify(error.message,"error");
     else notify("Si existe una cuenta con ese correo, recibirás un enlace para restablecer la contraseña. Revisa también la carpeta de spam.","success");
+  }
+
+  async function saveRecoveredPassword(e) {
+    e.preventDefault();
+    if (invitePassword.length < 8) return notify("La contraseña debe tener al menos 8 caracteres.","error");
+    setBusy(true); notify("");
+    const {error} = await supabase.auth.updateUser({password:invitePassword});
+    setBusy(false);
+    if (error) notify(error.message,"error");
+    else { setRecoveryFlow(false); setInvitePassword(""); window.history.replaceState({},document.title,window.location.pathname); notify("Contraseña actualizada. Ya puedes acceder a Fleet Booking.","success"); await supabase.auth.signOut(); }
   }
 
   async function book(e) {
@@ -195,6 +207,8 @@ export default function Home() {
   }
 
   if (!supabase) return <main className="shell"><section className="panel"><h1>Fleet Booking</h1><p>Falta configurar la conexión con Supabase en Vercel.</p></section></main>;
+
+  if (recoveryFlow) return <main className="login-shell"><section className="login-card"><p className="kicker">SEGURIDAD ／ RECUPERACIÓN DE ACCESO</p><h1>Nueva contraseña<span>.</span></h1><p className="muted">Elige una contraseña nueva de al menos 8 caracteres.</p><form onSubmit={saveRecoveredPassword} className="stack"><label>Nueva contraseña<input type="password" minLength={8} required value={invitePassword} onChange={e=>setInvitePassword(e.target.value)} autoComplete="new-password" placeholder="Nueva contraseña"/></label><button disabled={busy}>{busy?"Guardando…":"Guardar contraseña"}</button></form>{message && <p className={`notice ${messageType}`} role="status">{message}</p>}</section></main>;
 
   if (!session) return <main className="login-shell">
     <section className="login-story">
