@@ -32,6 +32,7 @@ export default function Home() {
   const [vehicles,setVehicles] = useState([]);
   const [reservations,setReservations] = useState([]);
   const [profiles,setProfiles] = useState([]);
+  const [users,setUsers] = useState([]);
   const [month,setMonth] = useState(() => new Date(new Date().getFullYear(),new Date().getMonth(),1));
   const [selectedDay,setSelectedDay] = useState(dateKey(new Date()));
   const [start,setStart] = useState(() => defaultBookingTimes(new Date())[0]);
@@ -51,12 +52,13 @@ export default function Home() {
   const loadData = useCallback(async (currentSession) => {
     if (!supabase || !currentSession) return;
     const uid = currentSession.user.id;
-    const [p, a, v, r, unlinked] = await Promise.all([
+    const [p, a, v, r, unlinked, allUsers] = await Promise.all([
       supabase.from("fleet_users").select("id,name").eq("auth_user_id",uid).maybeSingle(),
       supabase.from("fleet_admins").select("user_id").eq("user_id",uid).maybeSingle(),
       supabase.from("vehicles").select("id,plate,make_model,provider,active,maintenance").eq("active",true).order("plate"),
       supabase.from("reservations").select("id,vehicle_id,fleet_user_id,created_by,start_at,end_at,work_description,fleet_user:fleet_users!reservations_fleet_user_id_fkey(name)").gte("end_at",monthStart(month).toISOString()).lt("start_at",monthEnd(month).toISOString()).order("start_at"),
-      supabase.from("fleet_users").select("id,name,auth_user_id").is("auth_user_id",null).order("name")
+      supabase.from("fleet_users").select("id,name,auth_user_id").is("auth_user_id",null).order("name"),
+      supabase.from("fleet_users").select("id,name,auth_user_id").order("name")
     ]);
     if (p.error) notify(p.error.message,"error");
     if (v.error) notify(v.error.message,"error");
@@ -66,6 +68,8 @@ export default function Home() {
     setVehicles(v.data || []);
     setReservations(r.data || []);
     setProfiles(unlinked.data || []);
+    if (allUsers.error) notify(allUsers.error.message,"error");
+    setUsers(allUsers.data || []);
   },[month]);
 
   useEffect(() => {
@@ -262,6 +266,8 @@ export default function Home() {
     {isAdmin && <section className="panel admin-panel">
       <div className="section-heading"><div><p className="kicker">ESTADO DE LA FLOTA</p><h2>Disponibilidad de vehículos</h2><p className="muted">Marca los vehículos que estén en el taller para bloquear nuevas reservas.</p></div><span className="admin-chip">Solo administrador</span></div>
       <div className="fleet-status-list">{vehicles.map(v=><article className="fleet-status-item" key={v.id}><div><strong>{v.plate}</strong><small>{v.make_model} · {v.provider}</small></div><span className={`availability-tag ${v.maintenance?"maintenance":"free"}`}>{v.maintenance?"En el mecánico":"Operativo"}</span><button type="button" className="button-light" disabled={busy} onClick={()=>toggleVehicleMaintenance(v)}>{v.maintenance?"Reactivar vehículo":"Enviar al mecánico"}</button></article>)}</div>
+      <div className="section-heading"><div><p className="kicker">DIRECTORIO DEL EQUIPO</p><h2>Usuarios</h2><p className="muted">Personas y cuentas vinculadas a Fleet Booking.</p></div><span className="count-pill">{users.length} personas</span></div>
+      <div className="fleet-status-list">{users.map(u=><article className="fleet-status-item" key={u.id}><div><strong>{u.name}</strong><small>{u.auth_user_id ? "Cuenta vinculada" : "Pendiente de vincular cuenta"}</small></div><span className="admin-chip">{u.auth_user_id ? "Administrador" : "Perfil sin acceso"}</span></article>)}</div>
       <div className="section-heading"><div><p className="kicker">GESTIÓN DE ACCESOS</p><h2>Invitar a un usuario</h2><p className="muted">Envía una invitación y vincula la cuenta con un perfil de flota existente.</p></div><span className="admin-chip">Solo administrador</span></div>
       <form onSubmit={invite} className="invite-form">
         <label>Perfil de flota<select required value={inviteProfile} onChange={e=>setInviteProfile(e.target.value)}><option value="">Selecciona una persona</option>{profiles.map(p=><option key={p.id} value={p.id}>{p.name}</option>)}<option value="__new__">＋ Crear un perfil nuevo</option></select></label>
